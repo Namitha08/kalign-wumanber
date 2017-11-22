@@ -11,8 +11,8 @@ import java.util.Map;
  */
 public class kalign {
 
-    static int numseq;
-    static int numprofiles;
+    public static int numseq;
+    public static int numprofiles;
 
     public static void main(String[] args) {
         SequenceInfo si = new SequenceInfo();
