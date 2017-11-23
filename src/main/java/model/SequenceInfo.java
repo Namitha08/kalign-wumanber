@@ -7,7 +7,7 @@ import java.util.ArrayList;
  */
 public class SequenceInfo {
     // Sequences
-    public String[] s;
+    public int[][] s;
     // Sequence Length
     public int sl[];
     // sequence ids

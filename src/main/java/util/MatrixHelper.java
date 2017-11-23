@@ -14,4 +14,13 @@ public class MatrixHelper {
             System.out.println("\n");
         }
     }
+
+    public static void printArray(int [] matrix){
+        for(int i =0;i<matrix.length;i++){
+            // System.out.println("lenght " + matrix.length);
+            System.out.print(matrix[i] + " ");
+
+        }
+        System.out.println("\n");
+    }
 }
