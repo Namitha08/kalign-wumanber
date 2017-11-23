@@ -2,10 +2,7 @@ import model.SequenceInfo;
 import util.FileHelper;
 import util.MatrixHelper;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 /*Comment 1*/
 
 /**
@@ -19,7 +16,7 @@ public class kalign {
 
     public static void main(String[] args) {
         SequenceInfo si = new SequenceInfo();
-        si = readSequence("input.fasta", si);
+        si = readSequence("in.fasta", si);
         for (int i = 8000-1;i>=0;i--){
             matches[i] = null;
         }
@@ -28,7 +25,7 @@ public class kalign {
 
     public static SequenceInfo readSequence(String queryFile, SequenceInfo si){
 
-        HashMap<String,String> sequences = new HashMap<String, String>();
+        LinkedHashMap<String,String> sequences = new LinkedHashMap<String, String>();
         sequences = FileHelper.readSequenceFile(queryFile, sequences);
         Iterator iterator =  sequences.entrySet().iterator();
         int i=0;
@@ -44,10 +41,14 @@ public class kalign {
             String key = (String) pair.getKey();
             String value = (String) pair.getValue();
             String seq =  key.toUpperCase();
-            si.s[i] = new int[key.length()];
+            // TODO : Allocating 1 more letter space
+            si.s[i] = new int[key.length()+1];
             for (int j=0;j<key.length();j++){
                 si.s[i][j] = seq.charAt(j)-65;
             }
+            // TODO : assigning 0 to last extra space
+            si.s[i][key.length()] = 0;
+            MatrixHelper.printArray(si.s[i]);
             si.sl[i] = key.length();
             si.sn[i] = value;
             si.lsn[i] = value.length();
@@ -92,27 +93,32 @@ public class kalign {
 	    int map[] = {0,0,0,0,0,0,0,0,0,0};
         int[] sp;
         int out[][] = null;
+        System.out.println("Printing Keys\n");
         for (i = numseq-1;i>=0;i--){
             sp = si.s[i];
             for(j = si.sl[i]-2-1;j>=0;j--){
                 key = ((aacode[sp[j]]*20)+aacode[sp[j+1]])*20+aacode[sp[j+2]];
+                //System.out.print(key+" ");
                 if (matches[key]==null){
+                   // System.out.println("key "+ key);
                     matches[key] = new int [numprofiles][];
                     for (c = numprofiles-1;c>=0;c--){
                         matches[key][c] = null;
                     }
                 }
                 if (matches[key][i] == null){
+                    System.out.println("key " + key + " i " + i + " j " + j);
                     matches[key][i] = new int[10];
                     matches[key][i][0] = 1;
                 }
-
-                if ((matches[key][i][0] %10) != 0){
-                    matches[key][i] = Arrays.copyOf(matches[key][i], matches[key][i][0] + 10);
+                if ((matches[key][i][0] %10) == 0){
+                   System.out.println("Realloc key " + key + " i " + i + " j " + j);
+                    matches[key][i] = Arrays.copyOf(matches[key][i], (matches[key][i][0] + 10));
                 }
                 matches[key][i][matches[key][i][0]] = j;
                 matches[key][i][0] += 1;
             }
+            System.out.println("\n");
         }
 
         for (i = 8000-1;i>=0;i--){
@@ -129,7 +135,9 @@ public class kalign {
         for (i = numseq-1;i>=0;i--){
             for (j = 8000-1;j>=0;j--){
                 if (matches[j] != null){
+                   // System.out.println("out j " + j);
                     if(matches[j][i] == null){
+                       // System.out.println("j " + j + " i " + i +"\n");
                         map[c] = j;
                         key = j;
                         patterns[c*3 + 2] = aadecode[key / 400];
@@ -142,6 +150,8 @@ public class kalign {
                     if(c == 10){
                         //start of 10x Wu-Manber;
                         out = ten_wu_manber(si.s[i],si.sl[i],patterns);
+                        System.out.println("c = 10 ");
+                        MatrixHelper.printMatrix(out);
                         for (f = 0;f < 10;f++){
                             matches[map[f]][i] = out[f];
                             matches[map[f]][i][0] |= 0x00010000;
@@ -156,6 +166,8 @@ public class kalign {
                     patterns[f] = 9;
                 }
                 out = ten_wu_manber(si.s[i],si.sl[i],patterns);
+                System.out.println("c!=0");
+                MatrixHelper.printMatrix(out);
                 for (f = 0;f < c;f++){
                     matches[map[f]][i] = out[f];
                     matches[map[f]][i][0] |= 0x00010000;
@@ -164,8 +176,8 @@ public class kalign {
                 c = 0;
             }
         }
-
         MatrixHelper.printArray(patterns);
+
     }
 
     public static int[][] ten_wu_manber(int[] seq,int len,int p[])

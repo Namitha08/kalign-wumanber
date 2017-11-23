@@ -3,17 +3,14 @@ package util;
 import model.SequenceInfo;
 
 import java.io.*;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.StringTokenizer;
+import java.util.*;
 
 /**
  * Created by nammi on 21/10/17.
  */
 public class FileHelper {
     // HashMap()
-    public static HashMap<String,String> readSequenceFile(String filename, HashMap<String,String> map){
+    public static LinkedHashMap<String,String> readSequenceFile(String filename, LinkedHashMap<String,String> map){
         File file = new File(filename);
         FileReader fileReader = null;
         BufferedReader bufferedReader;
