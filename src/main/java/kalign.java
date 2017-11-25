@@ -12,17 +12,164 @@ public class kalign {
 
     public static int numseq;
     public static int numprofiles;
-    public static int[][][] matches = new int[8000][][];
 
     public static void main(String[] args) {
+        int[][][] matches = new int[8000][][];
+        double[][] dm;
+        int a,b;
+        int[] tree;
+
         SequenceInfo si = new SequenceInfo();
-        si = readSequence("in.fasta", si);
+        si = readSequence("input.fasta", si);
         for (int i = 8000-1;i>=0;i--){
             matches[i] = null;
         }
         fill_hash(si,matches);
+        dm = new double[numprofiles][];
+        for (int i = numprofiles-1;i>=0;i--){
+            dm[i] = new double[numprofiles];
+            for (int j = numprofiles-1;j>=0;j--){
+                dm[i][j] = 0;
+            }
+        }
+        System.out.println("Distance Calculation:");
+        b = (numseq*(numseq-1))/2;
+        a = 1;
+        for (int i = 0; i < numseq;i++){
+                for (int j = i+1; j < numseq;j++){
+                    dm[i][j] = distance_calculation(matches,si.sl[i],si.sl[j],i,j);
+                    System.out.println("percent done" + (double)a /(double)b * 100);
+                    a++;
+                }
+            }
+
+            MatrixHelper.printMatrix(dm);
+
+        for (int i = 8000-1; i>=0;i--){
+            if (matches[i] !=null){
+                for (int j = numseq-1;j>=0;j--){
+                    if (matches[i][j]!=null){
+                        matches[i][j][0] &= 0x0000ffff;
+                    }
+                }
+            }
+        }
+        tree = new int[(numseq-1)*2];
+        tree = upgma(dm,tree);
+        MatrixHelper.printArray(tree);
+        MatrixHelper.printMatrix(dm);
     }
 
+    static int[] upgma(double[][]dm,int[] tree)
+    {
+        int i,j,t;
+	    int[] as = new int[numprofiles];
+        double max;
+        int node_a = 0;
+        int node_b = 0;
+        int cnode;
+        cnode = numseq;
+
+        for (i = numseq-1;i>=0; i--){
+            as[i] = 1;
+        }
+        for (i = numseq; i < numprofiles;i++){
+            as[i] = 0;
+        }
+        t = 0;
+        while (cnode != numprofiles){
+            max = Integer.MIN_VALUE;
+            for (i = 0;i < numprofiles; i++){
+                if (as[i]!=0){
+                    for ( j = i +1;j < numprofiles;j++){
+                        if (as[j]!=0){
+                            if (dm[i][j] > max){
+                                max = dm[i][j];
+                                node_a = i;
+                                node_b = j;
+                            }
+                        }
+                    }
+                }
+            }
+		/*deactivate  sequences to be joined*/
+            as[node_a] = 0;
+            as[node_b] = 0;
+            tree[t] = node_a;
+            tree[t+1] = node_b;
+		/*calculate new distances*/
+            for (i = numprofiles-1;i>=0;i--){
+                if (as[i]!=0){
+                    dm[i][cnode] = (node_a < i)?dm[node_a][i]:dm[i][node_a];
+                    dm[i][cnode] += (node_b < i)?dm[node_b][i]:dm[i][node_b];
+                    dm[i][cnode] /= 2;
+                }
+            }
+            as[cnode] = 1;
+            cnode++;
+            t += 2;
+        }
+        return tree;
+    }
+
+    static double distance_calculation(int[][][] matches,int len_a,int len_b,int a,int b)//,int size)
+    {
+        double d = 0;
+        int i,j,c,tmp1,tmp2;
+	    int[] diagonal;
+	    int[] p1;
+	    int[] p2;
+	    int[] p=null;
+        diagonal = new int[len_a+len_b];
+        for(i = len_a + len_b-1;i>=0;i--){
+            diagonal[i] = 0;
+        }
+      // int temp = diagonal[len_a];
+        for (c = 8000-1;c>=0;c--){
+            if (matches[c] !=null){
+                if (((matches[c][a][0]&0x0000ffff)-1) !=0){
+                    p1 = matches[c][a];
+                    tmp1 = (p1[0] >> 16);
+                    if (((matches[c][b][0]&0x0000ffff)-1)!=0){
+                        p2 = matches[c][b];
+                        tmp2 = tmp1 * (p2[0]>>16);
+                        System.out.println("Printing p's");
+                        for (i = (p1[0] & 0x0000ffff)-1;i>0;i--){
+                           // int temp_p = p[temp+p1[i]];
+                           // p = diagonal - p1[i];
+                            for (j = (p2[0] & 0x0000ffff)-1;j>0;j--){
+                                //TODO :  check what shld be p ?
+                                diagonal[len_a-p1[i] + p2[j]] += tmp2;
+                                System.out.print( diagonal[len_a-p1[i] + p2[j]] + " ");
+                            }
+                            System.out.println("\n");
+                        }
+                    }
+                }
+            }
+        }
+
+      //  diagonal -= len_a;
+        c = 0; //min
+        for (i = 3-1; i>=0;i--){
+            for(j = len_a+len_b-1;j>=0;j--){
+                //fprintf(stdout,"	%d	c:%d\n",diagonal[j],c);
+                if (diagonal[j]!=0){
+                    if(diagonal[j] > (c & 0x0000ffff)){
+                        c = diagonal[j]| (j<<16);
+                        //fprintf(stderr,"c:%d	%d\n",c &0x0000ffff, c >>16);
+                    }
+                }
+            }
+            if (c!=0){
+                d += c & 0x0000ffff;
+                diagonal[c>>16] = 0;
+                c = 0;
+            }
+        }
+       // free(diagonal);
+        return d;
+    }
     public static SequenceInfo readSequence(String queryFile, SequenceInfo si){
 
         LinkedHashMap<String,String> sequences = new LinkedHashMap<String, String>();
