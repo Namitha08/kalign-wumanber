@@ -1,3 +1,4 @@
+import model.DPStructure;
 import model.SequenceInfo;
 import util.FileHelper;
 import util.MatrixHelper;
@@ -14,16 +15,30 @@ public class kalign {
     public static int numprofiles;
 
     public static void main(String[] args) {
+        int dia = 24;
         int[][][] matches = new int[8000][][];
         double[][] dm;
         int a,b;
         int[] tree;
-
+        int scoringArray[] =  new int[276];
+        int[][] submatrix = new int[32][32];
+        int gpo = 61;
+        int gpe = 18;
+        int newnode = numseq;
+        int len_a;
+        int len_b;
+        int path[];
+        char[] letters = {'A','B','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','X','Y','Z'};
         SequenceInfo si = new SequenceInfo();
         si = readSequence("input.fasta", si);
-        for (int i = 8000-1;i>=0;i--){
-            matches[i] = null;
-        }
+        DPStructure dp = new DPStructure();
+//        for (int i = 8000-1;i>=0;i--){
+//            matches[i] = null;
+//        }
+        int[][] profile = new int[numprofiles][];
+//        for (int i = numprofiles-1; i>=0;i--){
+//            profile[i] = null;
+//        }
         fill_hash(si,matches);
         dm = new double[numprofiles][];
         for (int i = numprofiles-1;i>=0;i--){
@@ -58,6 +73,341 @@ public class kalign {
         tree = upgma(dm,tree);
         MatrixHelper.printArray(tree);
         MatrixHelper.printMatrix(dm);
+
+        scoringArray = FileHelper.ReadScoringArray("gon250.txt", scoringArray);
+
+       MatrixHelper.printArray(scoringArray);
+        gpo = 61;
+        gpe = 18;
+        for (int i = 32-1;i>=0 ;i--){
+            for (int j = 32-1;j>=0;j--){
+                submatrix[i][j] = gpe;
+            }
+        }
+
+        submatrix = populateScoringMatrix(scoringArray, submatrix, gpo, letters);
+        MatrixHelper.printMatrix(submatrix);
+
+        dp = initializeDPStructure(dp,511,511);
+
+        int j;
+        System.out.println("\nAlignment:\n");
+        for (int i = 0; i < (numseq-1)*2;i +=2){
+            System.out.println("percent done"+ (double)(newnode-numseq) /(double)numseq * 100);
+            a = tree[i];
+            b = tree[i+1];
+            len_a = si.sl[a];
+            len_b = si.sl[b];
+            if (len_a < len_b){
+                j = a;
+                a = b;
+                b = j;
+                j = len_a;
+                len_a = len_b;
+                len_b = j;
+            }
+            dp = reInitializeDPStructure(dp,len_a,len_b);
+               //add_poits_to_matrix
+               // dp = dp_matrix_init(dp,len_a,len_b);
+                add_ptm(matches,dp.m,a,b);
+                MatrixHelper.printMatrix(dp.m);
+                dp = consistency_check(dp,len_a,len_b,dia);
+//                //add_ptm2(matches,dp,a,b);
+//                //dp = consistency_check2(dp,len_a,len_b,dia);
+
+
+            path = new int[len_a+len_b+2];
+            for (j = len_a+len_b+1;j>=0;j--){
+                path[j] = 0;
+            }
+
+           // System.out.println(a);
+//            int[] temp = profile[a];
+//            int[] temp2= si.s[a];
+
+            if (a < numseq){
+                profile[a] = make_profile(profile[a],si.s[a],len_a,submatrix);
+            }
+            if (b < numseq){
+                profile[b] = make_profile(profile[b],si.s[b],len_b,submatrix);
+            }
+            //profa = profile[a];
+            //profb = profile[b];
+
+            set_gap_penalties(profile[a],len_a,si.nsip[b]);
+            set_gap_penalties(profile[b],len_b,si.nsip[a]);
+//            path = main_fast_dyn(path,dp,profa,profb,len_a,len_b);
+//
+//            profile[newnode] = tmalloc(sizeof(int)*64*(path[0]+1));
+//            si = update(si,profile,a,b,newnode,path);
+//            if (points){
+//                update_hash(si,matches,a,b,newnode);
+//            }
+//            free(profa);
+//            free(profb);
+//            newnode++;
+        }
+    }
+
+    static void set_gap_penalties(int[] prof,int len,int nsip)
+    {
+        int i;
+        int pos=0;
+        pos+=  (64 *(len));
+        i = len;
+        while(i-->0){
+            pos -= 64;
+            prof[26+pos] = prof[41+pos]*nsip;
+            prof[27+pos] = prof[46+pos]*nsip;
+        }
+    }
+
+    static int[] make_profile(int[] prof,int[] seq,int len,int[][] subm)
+    {
+        int i,j,c;
+        prof = new int[(len+1)*64];
+        int pos =0;
+        pos+=  (64 *len);
+        //fprintf(stderr,"Len:%d	%d\n",len,64*len);
+        for (i = 64-1;i>=0;i--){
+            prof[pos+i] = 0;
+        }
+        prof[pos + 9+32] = subm[0][9];
+        prof[pos + 14+32] = subm[0][14];
+        i = len;
+       // pos = 64*len;
+        while(i-->0){
+            pos -= 64;
+            //fprintf(stderr,"-64\n");
+            for (j = 26-1;j>=0; j--){
+                prof[pos+j] = 0;
+            }
+            c = seq[i];
+            prof[pos+c] +=1;
+            pos += 32;
+            for(j = 32-1;j>=0;j--){
+                prof[pos+j] = subm[c][j];
+            }
+            pos -= 32;
+        }
+        return prof;
+    }
+
+    static DPStructure consistency_check(DPStructure dp,int len_a,int len_b, int dia)
+    {
+
+        int i,j;
+        int c = 0;
+
+
+       // tbop = tb[len_a];
+        for (j = len_b;j>=0;j--){
+            dp.tb[len_a][j] = 0;
+        }
+        //tbop[len_b] = 0;
+        for (i = len_a-1;i>=0;i--){
+//            mxp = mx[i];
+//            tbp = tb[i];
+            dp.tb[i][len_b] = 0;
+            for (j = len_b-1;j>=0;j--){
+                dp.tb[i][j] = 0;
+                if (dp.m[i][j]!=0){
+                    dp.tb[i][j] = dp.tb[i+1][j+1] + 1;
+                }
+                dp.m[i][j] += dp.m[i+1][j+1];
+                if (dp.m[i][j+1] > dp.m[i][j]){
+                    dp.m[i][j] = dp.m[i][j+1];
+                    dp.tb[i][j] = -1;
+                }
+                if (dp.m[i+1][j] > dp.m[i][j]){
+                    dp.m[i][j] = dp.m[i+1][j];
+                    dp.tb[i][j] = -2;
+                }
+            }
+//            mxop = mxp;
+//            tbop = tbp;
+        }
+        c = 0;
+        i = 0;
+        j = 0;
+        while (i < len_a && j < len_b){
+            //fprintf(stderr,"%d	%d\n",tb[i][j] & 0x0000ffff,c);
+            switch (dp.tb[i][j]){
+                case -1:
+                    //printf("%d:%d	%d\n",i,j,c);
+                    c = 0;
+                    j++;
+                    break;
+                case -2:
+                    //printf("%d:%d	%d\n",i,j,c);
+                    c = 0;
+                    i++;
+                    break;
+                default:
+                    if (c!=0){
+                        c = dp.tb[i][j];
+                        if (c < dia){
+                            c = 0;
+                        }else{
+                            c -= 1;
+                            while (--c>0){
+                                dp.true_x[i+c] = 2;
+                                dp.true_y[j+c] = 2;
+                            }
+                        }
+                    }
+                    //	tx[i] = 2;
+                    //	ty[j] = 2;
+                    i++;
+                    j++;
+                    break;
+
+            }
+        }
+        //exit(0);
+        dp.true_x[0] = 2;
+        dp.true_y[0] = 2;
+
+        return dp;
+    }
+
+    static void add_ptm(int[][][] matches,int[][] matrix,int a,int b)
+    {
+        int i,j,c;
+        int[] posa = null;
+        int[] posb = null;
+         for (c =8000-1; c>=0;c--){
+            if (matches[c]!=null){
+                if (matches[c][a] != null && matches[c][a][0]!= 1){
+                    if (matches[c][b] !=null &&matches[c][b][0]!= 1){
+                        posa = matches[c][a];
+                        posb = matches[c][b];
+                       // System.out.println(matrix[]);
+                        for (i = posa[0]-1;i>0;i--){
+                            for (j = posb[0]-1;j>0;j--){
+                                //System.out.println("pos a " + posa[i] + "posb " + posb[j] );
+                                System.out.println("size of matrix " + matrix[posa[i]] .length);
+                                matrix[posa[i]][posb[j]] += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    static DPStructure dp_matrix_init(DPStructure dp,int x,int y)
+    {
+        int[][] mx = null;
+            //int** tb = 0;
+        int[] mxp = null;
+            //int* tbp = 0;
+        int[] tx = null;
+        int[] ty = null;
+        int i,j;
+
+        tx = dp.true_x;
+        ty = dp.true_y;
+        //tb = dp->tb;
+        mx = dp.m;
+        for (i = x;i>=0;i--){
+            //tbp = tb[i];
+            mxp = mx[i];
+            tx[i] = 0;
+            for (j = y;j>=0;j--){
+                //	tbp[j] = 0;
+                mxp[j] = 0;
+            }
+        }
+        for (j = y;j>=0;j--){
+            ty[j] = 0;
+        }
+        return dp;
+    }
+   static DPStructure reInitializeDPStructure(DPStructure dp,int x,int y)
+    {
+        int i;
+        if ( x > dp.x || y > dp.y){
+            i = 1;
+            while (i <= y){
+                i <<= 1;
+                //	printf("i:%d	y:%d\n",i,y);
+            }
+            y = i-1;
+            i = 1;
+            while (i <= x){
+                i <<= 1;
+                //printf("i:%d	y:%d\n",i,y);
+            }
+            x = i-1;
+            //printf("NEWX:%d	NEWY:%d\n",x,y);
+            dp.a = new int[y+1];
+            dp.ga = new int[y+1];
+            dp.gb = new int[y+1];
+            dp.tb = new int[x+1][y+1];
+            dp.m = new int [x+1][y+1];
+//            for ( i = 1; i <= x;i++) {
+//                dp.tb[i] =  new int [1];
+//                int[] temp1 = new int[1];
+//                temp1[0] = (i * (y + 1));
+//                dp.tb[i] = temp1;
+//                dp.m[i] = temp1;
+//            }
+
+            dp.true_x = new int[x+1];
+            dp.true_y = new int[y+1];
+            dp.x = x;
+            dp.y = y;
+        }
+        return dp;
+    }
+
+    static DPStructure initializeDPStructure(DPStructure dp, int x, int y) {
+
+        int i;
+        dp.x = x;
+        dp.y = y;
+        dp.a = new int[y+1];
+        dp.ga = new int[y+1];
+        dp.gb = new int[y+1];
+        dp.true_x = new int[x+1];
+        dp.true_y = new int[y+1];
+        dp.tb = new int[x+1][y+1];
+        dp.m = new int [x+1][y+1];
+
+       // TODO : Check how to move the pointer index
+//        for ( i = 1; i <= x;i++) {
+//           //  dp.tb[i] =  new int [1];
+//            int[] temp1 = new int[1];
+//            temp1[0] = (i * (y + 1));
+//            dp.tb[i] = temp1;
+//            dp.m[i] = temp1;
+//            System.out.println(dp.tb[i][0]);
+//        }
+
+        return dp;
+    }
+
+    static int[][] populateScoringMatrix(int[] scoringArray,int[][] scoringmatrix,int gpo,char[] letters)
+    {
+        int i,j;
+        int m_pos = 0;
+        m_pos = 0;
+        for (i = 0;i < 23;i++){
+            for (j = 0;j <= i;j++){
+                if (i == j){
+                    scoringmatrix[letters[i]-65][letters[j]-65] += scoringArray[m_pos];
+                }else{
+                    scoringmatrix[letters[i]-65][letters[j]-65] += scoringArray[m_pos];
+                    scoringmatrix[letters[j]-65][letters[i]-65] += scoringArray[m_pos];
+                }
+                m_pos++;
+            }
+        }
+        for (i = 26-1;i>=0;i--){
+            scoringmatrix[i][9] = -gpo;
+        }
+        return scoringmatrix;
     }
 
     static int[] upgma(double[][]dm,int[] tree)
@@ -133,16 +483,15 @@ public class kalign {
                     if (((matches[c][b][0]&0x0000ffff)-1)!=0){
                         p2 = matches[c][b];
                         tmp2 = tmp1 * (p2[0]>>16);
-                        System.out.println("Printing p's");
+                       // System.out.println("Printing p's");
                         for (i = (p1[0] & 0x0000ffff)-1;i>0;i--){
                            // int temp_p = p[temp+p1[i]];
                            // p = diagonal - p1[i];
                             for (j = (p2[0] & 0x0000ffff)-1;j>0;j--){
-                                //TODO :  check what shld be p ?
                                 diagonal[len_a-p1[i] + p2[j]] += tmp2;
-                                System.out.print( diagonal[len_a-p1[i] + p2[j]] + " ");
+                               // System.out.print( diagonal[len_a-p1[i] + p2[j]] + " ");
                             }
-                            System.out.println("\n");
+                           // System.out.println("\n");
                         }
                     }
                 }
@@ -214,6 +563,9 @@ public class kalign {
 
         for(i= numseq-1 ;i>=0; i--) {
             //TODO : Extra last space allocated
+            si.sip[i] = new int[1];
+            si.nsip[i] = 1;
+            si.sip[i][0] = i;
             si.gis[i] = new int[si.sl[i] + 1];
             si.relpos[i] = new int[si.sl[i] + 1];
 

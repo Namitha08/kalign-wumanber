@@ -90,7 +90,7 @@ public class FileHelper {
         return letters;
     }
 
-    public static int[][] ReadScoringMatrix(String fileName, int[][] scoringMatrix){
+    public static int[] ReadScoringArray(String fileName, int[] scoringArray){
         File file = new File(fileName);
         FileReader fileReader = null;
         BufferedReader bufferedReader;
@@ -103,22 +103,19 @@ public class FileHelper {
         String line;
         StringBuffer stringBuffer = new StringBuffer();
         int i=0;
-        int j=0;
 
         try {
             while ((line = bufferedReader.readLine()) != null) {
-                StringTokenizer stringTokenizer = new StringTokenizer(line);
+                StringTokenizer stringTokenizer = new StringTokenizer(line, ",");
                 while (stringTokenizer.hasMoreTokens()){
                     String token = stringTokenizer.nextToken();
                     try {
-                        scoringMatrix[i][j] = Integer.parseInt(token.replaceAll("[^\\x00-\\x7F]", ""));
+                        scoringArray[i] = Integer.parseInt(token.replace(" ",""));
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
-                    j++;
+                    i++;
                 }
-                i++;
-                j=0;
             }
         }catch (IOException e){
             throw new IllegalArgumentException(e.getMessage());
@@ -132,6 +129,6 @@ public class FileHelper {
                 System.out.println("Warning Error while closing input stream");
             }
         }
-        return scoringMatrix;
+        return scoringArray;
     }
 }

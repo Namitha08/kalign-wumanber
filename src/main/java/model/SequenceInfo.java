@@ -1,7 +1,5 @@
 package model;
 
-import java.util.ArrayList;
-
 /**
  * Created by nammi on 21/11/17.
  */
@@ -12,7 +10,7 @@ public class SequenceInfo {
     public int sl[];
     // sequence ids
     public String[] sn;
-    // lenght of sequence
+    // lenght of sequence id's
     public int[] lsn;
     //
     public int[][] gis;
