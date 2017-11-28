@@ -28,6 +28,8 @@ public class kalign {
         int len_a;
         int len_b;
         int path[];
+        int profa[];
+        int profb[];
         char[] letters = {'A','B','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','X','Y','Z'};
         SequenceInfo si = new SequenceInfo();
         si = readSequence("input.fasta", si);
@@ -131,12 +133,16 @@ public class kalign {
             if (b < numseq){
                 profile[b] = make_profile(profile[b],si.s[b],len_b,submatrix);
             }
-            //profa = profile[a];
-            //profb = profile[b];
+            profa = profile[a];
+            profb = profile[b];
 
             set_gap_penalties(profile[a],len_a,si.nsip[b]);
             set_gap_penalties(profile[b],len_b,si.nsip[a]);
-//            path = main_fast_dyn(path,dp,profa,profb,len_a,len_b);
+            path = main_fast_dyn(path,dp,profa,profb,len_a,len_b);
+            System.out.println("path is ");
+            for(int l=0;l<path.length;l++){
+            	System.out.println(path[l]+" ");
+            }
 //
 //            profile[newnode] = tmalloc(sizeof(int)*64*(path[0]+1));
 //            si = update(si,profile,a,b,newnode,path);
@@ -160,6 +166,393 @@ public class kalign {
             prof[26+pos] = prof[41+pos]*nsip;
             prof[27+pos] = prof[46+pos]*nsip;
         }
+    }
+    
+    static int[] main_fast_dyn(int[] path, DPStructure dp,int[] prof1,int[] prof2,int len_a,int len_b)
+    {
+        int i,j,c;
+    	int i_limit = 0;
+    	int j_limit = 0;
+    	int startx = 0;
+    	int starty = 0;
+    	int endx = 0;
+    	int endy = 0;
+    	//int* tx = 0;
+    	//int* ty = 0;
+    //	int** trace = 0;
+    //	int* gap_a = 0;
+   // 	int* gap_b = 0;
+    //	int* align = 0;
+    //	int* tracep = 0;
+    	int pa = 0;
+    	int pga = 0;
+    	int pgb = 0;
+    	int ca = 0;
+    	int cga = 0;
+    	int cgb = 0;
+    	int ipos;
+    	int jpos;
+    	int[] freq = new int[(len_a+1)*26];
+
+    //	tx = dp->true_x;
+    //	ty = dp->true_y;
+    	
+
+    	//freq = tmalloc((len_a+1) * 26 * sizeof(unsigned int));
+    	int pos_prof1 =0;
+    	int pos_prof2=0;
+    	int pos_freq =0;
+    	
+    	pos_prof1 +=  len_a << 6;
+    	pos_freq += len_a *26; 
+    	for (i = len_a-1;i>=0;i--){
+    		pos_prof1 -= 64;
+    		pos_freq -= 26;
+    		c = 1;
+    		for (j = 26-1;j>=0; j--){
+    			if(prof1[pos_prof1+j]!=0){
+    				freq[pos_freq+c] = j;
+    				c++;	
+    			}
+    		}
+    		freq[pos_freq+0] = c;
+    	}
+
+    //	align = dp->a;
+    //	gap_a = dp->ga;
+    //	gap_b = dp->gb;
+    	dp.a[0] = 0;
+    	dp.ga[0] = Integer.MIN_VALUE;
+    	dp.gb[0] = Integer.MIN_VALUE;
+    //	trace = dp->tb;
+    	endx = len_a;
+    	startx = len_a;
+    	endy = len_b;
+    	starty = len_b;
+
+    	dp.tb[len_a][len_b] = 32;
+
+    	pos_prof1 +=  len_a << 6;
+    	
+    	pos_freq += len_a *26; 
+
+    	do{
+    		while(dp.true_x[startx] != 2){
+    			startx--;
+    		}
+    		while(dp.true_y[starty] != 2){
+    			starty--;
+    		}
+    		i_limit = endx-startx;
+    		j_limit = endy-starty;
+    		//copy last cell;
+    		dp.a[j_limit] = dp.a[0];
+    		dp.ga[j_limit] = dp.ga[0];
+    		dp.gb[j_limit] = dp.gb[0];
+    		//init of first row;
+    		//tracep = trace[endx];
+    		j = j_limit;
+    		if (endx == len_a){
+    			while(--j>0){
+    				dp.a[j] = Integer.MIN_VALUE;
+    				dp.ga[j] = 0;
+    				dp.gb[j] = Integer.MIN_VALUE;
+    				dp.tb[endx][starty+j] = 8;
+    			}
+    		}else{
+    			pos_prof2 +=  endy << 6;
+    			while(--j>0){
+    				pos_prof2 -= 64;
+    				dp.tb[endx][starty+j] = 0;
+    				dp.a[j] = Integer.MIN_VALUE;
+    				dp.ga[j] = dp.a[j+1] + prof2[pos_prof2+26];
+    				if (dp.ga[j+1] > dp.ga[j]){
+    					dp.ga[j] = dp.ga[j+1];
+    					dp.tb[endx][starty+j] |= 8;
+    				}
+    				dp.gb[j] = Integer.MIN_VALUE;
+    			}
+    			pos_prof2 -= (starty+1) << 6;//+1 cos while(--j) stops at 1;(1-1 = 0 stop!!!)
+    		}
+    		dp.a[0] = Integer.MIN_VALUE;
+    		dp.ga[0] = Integer.MIN_VALUE;
+    		dp.gb[0] = Integer.MIN_VALUE;
+    		pos_prof2 += starty << 6;
+    		i = i_limit;
+    		while(--i>0){
+    			pos_prof1 -= 64;
+    			
+    			pos_freq -= 26;
+    			
+    			ipos = startx+i;
+    			//tracep = trace[ipos];
+
+    			pa = dp.a[j_limit];
+    			pga = dp.ga[j_limit];
+    			pgb = dp.gb[j_limit];
+
+    			dp.a[j_limit] = Integer.MIN_VALUE;
+    			dp.ga[j_limit] = Integer.MIN_VALUE;
+
+    			dp.tb[ipos][endy] = 0;
+
+    			if (endy == len_b){
+    				dp.gb[j_limit] = 0;
+    				dp.tb[ipos][endy] |= 16;
+    			}else{
+    				dp.gb[j_limit] = pa+prof1[pos_prof1+26];
+    				if(pgb > dp.gb[j_limit]){
+    					dp.gb[j_limit] = pgb;//pgb+prof2[endy][27];
+    					dp.tb[ipos][endy] |= 16;
+    				}
+    			}
+    			j = j_limit;
+    			pos_prof2 += j_limit << 6;
+    			while(--j>0){
+    				pos_prof2 -= 64;
+    				jpos = starty+j;
+    				ca = dp.a[j];
+    				cga = dp.ga[j];
+    				cgb = dp.gb[j];
+    				dp.a[j] = pa;
+    				dp.tb[ipos][jpos] = 1;
+    				if((c = pga+prof2[pos_prof2+ 64+26]) > dp.a[j]){ // TODO: check prof2 value
+    					dp.a[j] = c;//pga+prof1[ipos+1][26];
+    					dp.tb[ipos][jpos] = 2;
+    				}
+    				if((c = pgb+prof1[pos_prof1+ 64+26]) > dp.a[j]){
+    					dp.a[j] = c;//pgb+prof2[jpos+1][26];
+    					dp.tb[ipos][jpos] = 4;
+    				}
+    				for (c = freq[pos_freq+0]-1;c>0;--c){
+    					dp.a[j] += prof1[pos_prof1+freq[pos_freq+c]]*prof2[pos_prof2+freq[pos_freq+c] | 32];
+    				}
+    				dp.ga[j] = dp.a[j+1]+prof2[pos_prof2+26];
+    				if (dp.ga[j+1] > dp.ga[j]){
+    					dp.ga[j] = dp.ga[j+1];//gap_a[j+1]+prof1[ipos][27];
+    					dp.tb[ipos][jpos] |= 8;
+    				}
+    				dp.gb[j] = ca+prof1[pos_prof1+26];// prof2[jpos][26];
+    				if(cgb > dp.gb[j]){
+    					dp.gb[j] = cgb;//cgb+prof2[jpos][27];
+    					dp.tb[ipos][jpos] |= 16;
+    				}
+    				pa = ca;
+    				pga = cga;
+    				pgb = cgb;
+    			}
+    			pos_prof2 -= 64;
+    			//LAST CELL (0)
+    			ca = dp.a[0];
+    			cga = dp.ga[0];
+    			cgb = dp.gb[0];
+
+    			dp.a[0] = pa;
+    			dp.tb[ipos][starty] = 1;
+    			if((c = pga+prof2[pos_prof2+ 64+26]) > dp.a[0]){
+    				dp.a[0] = c;//pga+prof1[ipos+1][26];
+    				dp.tb[ipos][starty] = 2;
+    			}
+    			if((c = pgb+prof1[pos_prof1+ 64+26]) > dp.a[0]){
+    				dp.a[0] = c;//pgb+prof2[jpos+1][26];
+    				dp.tb[ipos][starty] = 4;
+    			}
+    			for (c = freq[pos_freq+0]-1;c>0;--c){
+    				dp.a[j] += prof1[pos_prof1+freq[pos_freq+c]]*prof2[pos_prof2+freq[pos_freq+c] | 32];
+    			}
+    			
+    			dp.ga[j] = Integer.MIN_VALUE;
+    			
+    			dp.gb[0] = ca+prof1[pos_prof1+26];
+     			if(cgb > dp.gb[0]){
+    				dp.gb[0] = cgb;
+    				dp.tb[ipos][starty] |= 16;
+    			}
+    		}
+    		pos_prof1 -= 64;
+    		
+    		pos_freq -= 26;
+    		//tracep = trace[startx];
+    		j = j_limit;
+
+    		pos_prof2 += j_limit << 6;
+    		pa = dp.a[j];
+    		pga = dp.ga[j];
+    		pgb = dp.gb[j];
+
+    		dp.a[j] = Integer.MIN_VALUE;
+    		dp.ga[j] = Integer.MIN_VALUE;
+    		dp.gb[j_limit] = Integer.MIN_VALUE;
+    		while(--j>0){
+    			pos_prof2 -= 64;
+    			
+    			jpos = starty+j;
+
+    			ca = dp.a[j];
+    			cga = dp.ga[j];
+    			cgb = dp.gb[j];
+
+    			dp.a[j] = pa;
+    			dp.tb[startx][jpos] = 1;
+    			if((c = pga+prof2[pos_prof2+ 64+26]) > dp.a[j]){
+    				dp.a[j] = c;//pga+prof1[ipos+1][26];
+    				dp.tb[startx][jpos] = 2;
+    			}
+    			//Gap_b->Align
+    			if((c = pgb+prof1[pos_prof1+ 64+26]) > dp.a[j]){
+    				dp.a[j] = c;//pgb+prof2[jpos+1][26];
+    				dp.tb[startx][jpos] = 4;
+    			}
+    			
+    			for (c = freq[pos_freq+0]-1;c>0;--c){
+    				dp.a[j] += prof1[freq[pos_prof1+pos_freq+c]]*prof2[pos_prof2+freq[pos_freq+c] | 32];
+    			}
+    			dp.ga[j] = dp.a[j+1]+prof2[pos_prof2+26];
+    			if (dp.ga[j+1] > dp.ga[j]){
+    				dp.ga[j] = dp.ga[j+1];//gap_a[j+1]+prof1[ipos][27];
+    				dp.tb[startx][jpos] |= 8;
+    			}
+    			dp.gb[j] = Integer.MIN_VALUE;
+    			pa = ca;
+    			pga = cga;
+    			pgb = cgb;
+    		}
+
+    		pos_prof2 -= 64;
+
+    		ca = dp.a[0];
+    		cga = dp.ga[0];
+    		cgb = dp.gb[0];
+    		dp.a[0] = pa;
+    		dp.tb[startx][starty] = 1;
+    		if((c = pga+prof2[pos_prof2+ 64+26]) > dp.a[0]){
+    			dp.a[0] = c;//pga+prof1[ipos+1][26];
+    			dp.tb[startx][starty] = 2;
+    		}
+    		if((c = pgb+prof1[pos_prof1+ 64+26]) > dp.a[0]){
+    			dp.a[0] = c;//pgb+prof2[jpos+1][26];
+    			dp.tb[startx][starty] = 4;
+    		}
+    		
+    		for (c = freq[pos_freq+0]-1;c>0;--c){	
+    			dp.a[j] += prof1[pos_prof1+freq[pos_freq+c]]*prof2[pos_prof2+freq[pos_freq+c] | 32];
+    		}
+    		dp.ga[j] = dp.a[j+1]+prof2[pos_prof2+26];
+    		//fprintf(stderr,"Gap-a:%d\n",prof2[26]);
+    		//Gap_a->Gap_a
+    		if (dp.ga[j+1] > dp.ga[j]){
+    			dp.ga[j] = dp.ga[j+1];//gap_a[j+1]+prof1[ipos][27];
+    			dp.tb[startx][starty] |= 8;
+    		}
+    		dp.gb[0] = ca+prof1[pos_prof1+26];// prof2[jpos][26];
+    		//fprintf(stderr,"Gap-b:%d\n",prof1[26]);
+    		//Gap_b->Gap_b
+    		if(cgb > dp.gb[0]){
+    			dp.gb[0]= cgb;
+    			dp.tb[startx][starty] |= 16;
+    		}
+    		pos_prof2 -= starty<<6;
+    		//fprintf(stderr,"\nMOVED-::%d\n",(starty) << 6);
+    		endx = startx;
+    		endy = starty;
+    		startx--;
+    		starty--;
+    	}while (startx >= 0 || starty >= 0);
+
+    	//free(freq);
+
+    	ca = dp.gb[0];
+    	c = 2;
+    	if(dp.ga[0] > ca){
+    		ca = dp.ga[0];
+    		c = 1;
+    	}
+    	if(dp.a[0] >= ca){
+    		//ca = align[0];
+    		c = 0;
+    	}
+    	//fprintf(stderr,"STATE:%d	%d\n",c,ca);
+    	ca = c;
+    	
+    	i = 0;
+    	j = 0;
+    	c = 1;
+    	System.out.println("printing tb *********************");
+    	for(int m=0;m<512;m++){
+    		for(int n=0;n<512;n++){
+    			System.out.print(dp.tb[m][n]+" ");
+    		}
+    		System.out.println();
+    	}
+    	while(dp.tb[i][j] < 32){
+    	//	fprintf(stderr,"%d->%d	%d:%d	%d:%d\n",c,trace[i][j],i,j,len_a,len_b);
+    		switch(ca){
+    			case 0:
+    				if ((dp.tb[i][j] & 2)!=0){
+    					ca = 1;
+    					if(i+1!= len_a){
+    						path[c+1] |= 16;
+    	//					fprintf(stderr,"GAP_CLOSE\n");
+    					}
+    				}else if ((dp.tb[i][j] & 4)!=0){
+    					ca = 2;
+    					if(j+1!= len_b){
+    						path[c+1] |= 16;
+    	//					fprintf(stderr,"GAP_CLOSE\n");
+    					}
+    				}
+
+    				//path[c] = 0;
+    				i++;
+    				j++;
+    			break;
+    			case 1:
+    				if((dp.tb[i][j] & 8)!=0){
+    					ca = 1;
+    					if(i!=0 && i!= len_a){
+    	//					fprintf(stderr,"GAP_EXT\n");
+    						if((path[c]&16)==0){ //TODO: check value
+    							path[c] |= 8;
+    						}
+    					}
+    				}else{
+    					ca = 0;
+    					if(i!=0 && i!= len_a){
+    	//					fprintf(stderr,"GAP_OPEN\n");
+    						path[c] |= 4;
+    					}
+
+    				}
+    				path[c] |= 1;
+    				j++;
+    			break;
+    			case  2:
+    				if((dp.tb[i][j] & 16)!=0){
+    					ca = 2;
+    					if(j !=0 && j != len_b){
+    	//					fprintf(stderr,"GAP_EXT\n");
+    						if((path[c]&16)==0){
+    							path[c] |= 8;
+    						}
+    					}
+    				}else{
+    					ca = 0;
+    					if(j!=0 && j != len_b){
+    	//					fprintf(stderr,"GAP_OPEN\n");
+    						path[c] |= 4;
+    					}
+    				}
+    				path[c] |= 2;
+    				i++;
+    			break;
+    		}
+    		c++;
+    		//System.out.println("i is "+i);
+    		//System.out.println("j is "+j);
+    	}
+    	path[0] = c-1;
+    	path[c] = 3;
+    	return path;
     }
 
     static int[] make_profile(int[] prof,int[] seq,int len,int[][] subm)
