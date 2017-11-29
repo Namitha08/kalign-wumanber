@@ -18,169 +18,175 @@ public class kalign {
 	static int gpo = 61;
 	static int gpe = 18;
 
-	public static void main(String[] args) {
+//	public static void main(String[] args) {
+//
+//		int[][] scoringMatrix = new int[26][26];
+//		int[] scoringArray = new int[276];
+//		char[] letters = {'A','B','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','X','Y','Z'};
+//		scoringArray = FileHelper.ReadScoringArray("gon250.txt",scoringArray);
+//		for(int i=0;i<scoringMatrix.length;i++){
+//			for (int j=0;j<scoringMatrix[i].length;j++){
+//				scoringMatrix[i][j]=0;
+//			}
+//		}
+//
+//		scoringMatrix = SopCalculator.populateScoringMatrix(scoringArray,scoringMatrix,letters);
+//		int score = SopCalculator.calcSop("out.fasta",scoringMatrix,-61);
+//		System.out.println(score);
+//	}
+//
+    public static void main(String[] args) {
+        int dia = 24;
+        int[][][] matches = new int[8000][][];
+        double[][] dm;
+        int a,b;
+        int[] tree;
+        int scoringArray[] =  new int[276];
+        int[][] submatrix = new int[32][32];
+        int len_a;
+        int len_b;
+        int path[];
+        int profa[];
+        int profb[];
+        char[] letters = {'A','B','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','X','Y','Z'};
+        SequenceInfo si = new SequenceInfo();
+        si = readSequence("input.fasta", si);
+        DPStructure dp = new DPStructure();
+//        for (int i = 8000-1;i>=0;i--){
+//            matches[i] = null;
+//        }
+        int[][] profile = new int[numprofiles][];
+		int newnode = numseq;
+//        for (int i = numprofiles-1; i>=0;i--){
+//            profile[i] = null;
+//        }
+        fill_hash(si,matches);
+        dm = new double[numprofiles][];
+        for (int i = numprofiles-1;i>=0;i--){
+            dm[i] = new double[numprofiles];
+            for (int j = numprofiles-1;j>=0;j--){
+                dm[i][j] = 0;
+            }
+        }
+        System.out.println("Distance Calculation:");
+        b = (numseq*(numseq-1))/2;
+        a = 1;
+        for (int i = 0; i < numseq;i++){
+                for (int j = i+1; j < numseq;j++){
+                    dm[i][j] = distance_calculation(matches,si.sl[i],si.sl[j],i,j);
+                    System.out.println("percent done" + (double)a /(double)b * 100);
+                    a++;
+                }
+            }
 
-		int[][] scoringMatrix = new int[26][26];
-		int[] scoringArray = new int[276];
-		char[] letters = {'A','B','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','X','Y','Z'};
-		scoringArray = FileHelper.ReadScoringArray("gon250.txt",scoringArray);
-		for(int i=0;i<scoringMatrix.length;i++){
-			for (int j=0;j<scoringMatrix[i].length;j++){
-				scoringMatrix[i][j]=0;
-			}
-		}
+           // MatrixHelper.printMatrix(dm);
 
-		scoringMatrix = SopCalculator.populateScoringMatrix(scoringArray,scoringMatrix,letters);
-		int score = SopCalculator.calcSop("out.fasta",scoringMatrix,-61);
-		System.out.println(score);
-	}
-//
-//    public static void main(String[] args) {
-//        int dia = 24;
-//        int[][][] matches = new int[8000][][];
-//        double[][] dm;
-//        int a,b;
-//        int[] tree;
-//        int scoringArray[] =  new int[276];
-//        int[][] submatrix = new int[32][32];
-//        int newnode = numseq;
-//        int len_a;
-//        int len_b;
-//        int path[];
-//        int profa[];
-//        int profb[];
-//        char[] letters = {'A','B','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','X','Y','Z'};
-//        SequenceInfo si = new SequenceInfo();
-//        si = readSequence("input.fasta", si);
-//        DPStructure dp = new DPStructure();
-////        for (int i = 8000-1;i>=0;i--){
-////            matches[i] = null;
-////        }
-//        int[][] profile = new int[numprofiles][];
-////        for (int i = numprofiles-1; i>=0;i--){
-////            profile[i] = null;
-////        }
-//        fill_hash(si,matches);
-//        dm = new double[numprofiles][];
-//        for (int i = numprofiles-1;i>=0;i--){
-//            dm[i] = new double[numprofiles];
-//            for (int j = numprofiles-1;j>=0;j--){
-//                dm[i][j] = 0;
+        for (int i = 8000-1; i>=0;i--){
+            if (matches[i] !=null){
+                for (int j = numseq-1;j>=0;j--){
+                    if (matches[i][j]!=null){
+                        matches[i][j][0] &= 0x0000ffff;
+                    }
+                }
+            }
+        }
+        tree = new int[(numseq-1)*2];
+        tree = upgma(dm,tree);
+        MatrixHelper.printArray(tree);
+//        MatrixHelper.printMatrix(dm);
+
+        scoringArray = FileHelper.ReadScoringArray("gon250.txt", scoringArray);
+
+    //   MatrixHelper.printArray(scoringArray);
+
+        for (int i = 32-1;i>=0 ;i--){
+            for (int j = 32-1;j>=0;j--){
+                submatrix[i][j] = gpe;
+            }
+        }
+
+        submatrix = populateScoringMatrix(scoringArray, submatrix, gpo, letters);
+        //MatrixHelper.printMatrix(submatrix);
+
+        dp = initializeDPStructure(dp,511,511);
+
+        int j;
+		MatrixHelper.printArray(si.sl);
+        System.out.println("\nAlignment:\n");
+        for (int i = 0; i < (numseq-1)*2;i +=2){
+            System.out.println("percent done"+ (double)(newnode-numseq) /(double)numseq * 100);
+            a = tree[i];
+            b = tree[i+1];
+            len_a = si.sl[a];
+            len_b = si.sl[b];
+            if (len_a < len_b){
+                j = a;
+                a = b;
+                b = j;
+                j = len_a;
+                len_a = len_b;
+                len_b = j;
+            }
+            dp = reInitializeDPStructure(dp,len_a,len_b);
+               //add_poits_to_matrix
+               // dp = dp_matrix_init(dp,len_a,len_b);
+                add_ptm(matches,dp.m,a,b);
+             //   MatrixHelper.printMatrix(dp.m);
+                dp = consistency_check(dp,len_a,len_b,dia);
+//                //add_ptm2(matches,dp,a,b);
+//                //dp = consistency_check2(dp,len_a,len_b,dia);
+
+
+            path = new int[len_a+len_b+2];
+            for (j = len_a+len_b+1;j>=0;j--){
+                path[j] = 0;
+            }
+
+           // System.out.println(a);
+//            int[] temp = profile[a];
+//            int[] temp2= si.s[a];
+
+            if (a < numseq){
+				System.out.println("sequence a");
+				MatrixHelper.printArray(si.s[a]);
+				System.out.println(si.s[a].length + " "+ len_a + " " + a);
+
+				profile[a] = make_profile(profile[a],si.s[a],len_a,submatrix);
+
+            }
+            if (b < numseq){
+                profile[b] = make_profile(profile[b],si.s[b],len_b,submatrix);
+            }
+			System.out.println("lena = " + len_a + ", lenb = "+len_b);
+			set_gap_penalties(profile[a],len_a,si.nsip[b]);
+            set_gap_penalties(profile[b],len_b,si.nsip[a]);
+			profa = profile[a];
+            profb = profile[b];
+            path = main_fast_dyn(path,dp,profa,profb,len_a,len_b);
+			System.out.println("i = " + i + ", a = " + a + ", b = " + b);
+			MatrixHelper.printArray(path);
+
+            profile[newnode] = new int [64*(path[0]+1)];
+			System.out.println("newnode " + newnode);
+			si = update(si,profile,a,b,newnode,path);
+			System.out.println("sl after update");
+			MatrixHelper.printArray(si.sl);
+//            if (points){
+//                update_hash(si,matches,a,b,newnode);
 //            }
-//        }
-//        System.out.println("Distance Calculation:");
-//        b = (numseq*(numseq-1))/2;
-//        a = 1;
-//        for (int i = 0; i < numseq;i++){
-//                for (int j = i+1; j < numseq;j++){
-//                    dm[i][j] = distance_calculation(matches,si.sl[i],si.sl[j],i,j);
-//                    System.out.println("percent done" + (double)a /(double)b * 100);
-//                    a++;
-//                }
-//            }
-//
-//           // MatrixHelper.printMatrix(dm);
-//
-//        for (int i = 8000-1; i>=0;i--){
-//            if (matches[i] !=null){
-//                for (int j = numseq-1;j>=0;j--){
-//                    if (matches[i][j]!=null){
-//                        matches[i][j][0] &= 0x0000ffff;
-//                    }
-//                }
-//            }
-//        }
-//        tree = new int[(numseq-1)*2];
-//        tree = upgma(dm,tree);
-//        MatrixHelper.printArray(tree);
-////        MatrixHelper.printMatrix(dm);
-//
-//        scoringArray = FileHelper.ReadScoringArray("gon250.txt", scoringArray);
-//
-//    //   MatrixHelper.printArray(scoringArray);
-//
-//        for (int i = 32-1;i>=0 ;i--){
-//            for (int j = 32-1;j>=0;j--){
-//                submatrix[i][j] = gpe;
-//            }
-//        }
-//
-//        submatrix = populateScoringMatrix(scoringArray, submatrix, gpo, letters);
-//        //MatrixHelper.printMatrix(submatrix);
-//
-//        dp = initializeDPStructure(dp,511,511);
-//
-//        int j;
-//		MatrixHelper.printArray(si.sl);
-//        System.out.println("\nAlignment:\n");
-//        for (int i = 0; i < (numseq-1)*2;i +=2){
-//            System.out.println("percent done"+ (double)(newnode-numseq) /(double)numseq * 100);
-//            a = tree[i];
-//            b = tree[i+1];
-//            len_a = si.sl[a];
-//            len_b = si.sl[b];
-//            if (len_a < len_b){
-//                j = a;
-//                a = b;
-//                b = j;
-//                j = len_a;
-//                len_a = len_b;
-//                len_b = j;
-//            }
-//            dp = reInitializeDPStructure(dp,len_a,len_b);
-//               //add_poits_to_matrix
-//               // dp = dp_matrix_init(dp,len_a,len_b);
-//                add_ptm(matches,dp.m,a,b);
-//             //   MatrixHelper.printMatrix(dp.m);
-//                dp = consistency_check(dp,len_a,len_b,dia);
-////                //add_ptm2(matches,dp,a,b);
-////                //dp = consistency_check2(dp,len_a,len_b,dia);
-//
-//
-//            path = new int[len_a+len_b+2];
-//            for (j = len_a+len_b+1;j>=0;j--){
-//                path[j] = 0;
-//            }
-//
-//           // System.out.println(a);
-////            int[] temp = profile[a];
-////            int[] temp2= si.s[a];
-//
-//            if (a < numseq){
-//                profile[a] = make_profile(profile[a],si.s[a],len_a,submatrix);
-//            }
-//            if (b < numseq){
-//                profile[b] = make_profile(profile[b],si.s[b],len_b,submatrix);
-//            }
-//			System.out.println("lena = " + len_a + ", lenb = "+len_b);
-//			set_gap_penalties(profile[a],len_a,si.nsip[b]);
-//            set_gap_penalties(profile[b],len_b,si.nsip[a]);
-//			profa = profile[a];
-//            profb = profile[b];
-//            path = main_fast_dyn(path,dp,profa,profb,len_a,len_b);
-//			System.out.println("i = " + i + ", a = " + a + ", b = " + b);
-//			MatrixHelper.printArray(path);
-//
-//
-//
-//            profile[newnode] = new int [64*(path[0]+1)];
-//            si = update(si,profile,a,b,newnode,path);
-////            if (points){
-////                update_hash(si,matches,a,b,newnode);
-////            }
-////            free(profa);
-////            free(profb);
-////            newnode++;
-//        }
-////		if(!quiet)fprintf(stderr,"\r%8.0f percent done",100.0);
-////		if(!quiet)fprintf(stderr,"\n");
-////		print_alignment(si,outfile);
-////		if (!df){
-////			for (i = numprofiles;i--;){
-////				free(dm[i]);
-////			}
-////			free(dm);
-//    }
+//            free(profa);
+//            free(profb);
+            newnode++;
+        }
+//		if(!quiet)fprintf(stderr,"\r%8.0f percent done",100.0);
+//		if(!quiet)fprintf(stderr,"\n");
+//		print_alignment(si,outfile);
+//		if (!df){
+//			for (i = numprofiles;i--;){
+//				free(dm[i]);
+//			}
+//			free(dm);
+    }
 
 
 
@@ -239,7 +245,7 @@ public class kalign {
 			if ((path[c] & 1)!=0){
 				//		fprintf(stderr,"Gap_A:%d\n",c);
 				for (i = 64-1;i>=0; i--){
-					profile[newnode][i+pos_newp] = profile[b+pos_profb][i];
+					profile[newnode][i+pos_newp] = profile[b][i+pos_profb];
 				}
 				si.relpos[b][posb] += addb;
 				adda += 1;
@@ -310,8 +316,9 @@ public class kalign {
 			}
 			if ((path[c] & 2)!=0){
 				//		fprintf(stderr,"Gap_B:%d\n",c);
+				System.out.println("size of profile "+ profile.length + " " + profile[newnode].length);
 				for (i = 64-1;i>=0; i--){
-					profile[newnode][i+pos_newp] = profile[a+pos_profa][i];
+					profile[newnode][i+pos_newp] = profile[a][i+pos_profa];
 				}
 				si.relpos[a][posa] += adda;
 				addb += 1;
