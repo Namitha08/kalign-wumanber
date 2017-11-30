@@ -170,12 +170,9 @@ public class kalign {
 			System.out.println("newnode " + newnode);
 			si = update(si,profile,a,b,newnode,path);
 			System.out.println("sl after update");
-			MatrixHelper.printArray(si.sl);
-//            if (points){
-//                update_hash(si,matches,a,b,newnode);
-//            }
-//            free(profa);
-//            free(profb);
+
+            update_hash(si,matches,a,b,newnode);
+
             newnode++;
         }
 //		if(!quiet)fprintf(stderr,"\r%8.0f percent done",100.0);
@@ -188,7 +185,124 @@ public class kalign {
 //			free(dm);
     }
 
+	static void update_hash(SequenceInfo si,int[][][] matches,int a,int b,int nue)
+	{
+		int n,i,j,c;
+		int nma;
+		int nmb;
+		int ma = 0;
+		int mb = 0;
+		int comp;
+//	int* rela = 0;
+//	int* relb = 0;
+//		rela = si->relpos[a];
+//		relb = si->relpos[b];
 
+	/*fprintf(stderr,"LEN%d:%d\n",a,si->sl[a]);
+	for (i = 0; i < si->sl[a]-1;i++){
+		fprintf(stderr,"%d ",si->relpos[a][i]);
+		//if (si->relpos[a][i] > si->relpos[a][i+1]){
+		//	exit(0);
+		//}
+	}
+	fprintf(stderr,"\n");*/
+		//exit(0);
+		for (n = 8000-1;n>=0;n--){
+			if(matches[n]!=null){
+				if ((nma = matches[n][a][0]-1)!=0){
+					if((nmb = matches[n][b][0]-1)!=0){
+						//fprintf(stderr,"UPDATING:\n");
+						//fprintf(stderr,"nma:%d	nmb:%d\n",nma,nmb);
+						matches[n][nue] = new int[nma+nmb+1];
+						//matches[n][new][0] = nma+nmb+1;
+					/*fprintf(stderr,"A:");
+					for (i = 1;i <= nma;i++){
+						fprintf(stderr,"%d:%d	",rela[matches[n][a][i] & 0x0000ffff],matches[n][a][i]>>16);
+					}
+					fprintf(stderr,"\n");
+					fprintf(stderr,"B:");
+					for (i = 1;i <= nmb;i++){
+						fprintf(stderr,"%d:%d	",relb[matches[n][b][i]& 0x0000ffff],matches[n][b][i]>>16);
+					}
+					fprintf(stderr,"\n");*/
+
+						i = 1;
+						j = 1;
+						c = 1;
+						while (i <= nma && j <= nmb ){
+							ma = matches[n][a][i];
+							mb = matches[n][b][j];
+							comp = trueOrFalse(si.relpos[a][ma], si.relpos[b][mb]);
+							switch(comp){
+								case 0:
+									matches[n][nue][c] = si.relpos[a][ma];
+									i++;
+									j++;
+									//	c++;
+									break;
+								case 1:
+									matches[n][nue][c] = si.relpos[a][ma];
+									i++;
+									break;
+								case -1:
+									matches[n][nue][c] = si.relpos[b][mb];
+									j++;
+									break;
+							}
+							c++;
+						}
+						ma = matches[n][a][i];
+						System.out.println("n = "+ n + ", b = " + b+ ", j = " +j);
+						mb = matches[n][b][j];
+						//fprintf(stderr,"c:%d	i:%d	j:%d\n",c,i,j);
+						while (i <= nma){
+							ma = matches[n][a][i];
+							//matches[n][new][c] =rela[ma & 0x0000ffff] | (ma & 0xffff0000);
+							matches[n][nue][c] =si.relpos[a][ma];// | (ma & 0xffff0000);
+							i++;
+							c++;
+						}
+						while (j <= nmb){
+							mb = matches[n][b][j];
+							//matches[n][new][c] =relb[mb & 0x0000ffff] | (mb & 0xffff0000);
+							matches[n][nue][c] =si.relpos[b][mb];// | (mb & 0xffff0000);
+							j++;
+							c++;
+						}
+						matches[n][nue][0] = c;
+					/*fprintf(stderr,"N:");
+					for (i = 0;i < c;i++){
+						fprintf(stderr,"%d:%d	",matches[n][new][i]& 0x0000ffff,matches[n][new][i]>>16);
+					}
+					fprintf(stderr,"\n");*/
+						//exit(0);
+
+					}
+				}
+				if(matches[n][nue]==null){
+					//fprintf(stderr,"SHIT\n");
+					matches[n][nue] = new int[1];
+					matches[n][nue][0] = 1;
+				}
+
+			}
+		}
+	}
+
+	static int trueOrFalse(int a,int b){
+		int result=0;
+		if(a>b){
+			result=1;
+		}
+		else if(b>a){
+			result=-1;
+		}
+		else if(a==b){
+			result = 0;
+		}
+
+		return result;
+	}
 
 	static SequenceInfo update(SequenceInfo si,int[][] profile,int a,int b,int newnode,int[] path)
 	{
